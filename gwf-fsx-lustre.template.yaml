@@ -1,0 +1,232 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  (WWPS-GLS-WF-FSX) Creates Batch and FSx Lustre infrastructure for genomics
+  workflows
+
+Mappings:
+  TagMap:
+    default:
+      architecture: "genomics-workflows"
+      solution: "step-functions"
+      tags:
+        - Key: "architecture"
+          Value: "genomics-workflows"
+        - Key: "solution"
+          Value: "step-functions"
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: 'The VPC to create security groups and deploy AWS Batch to. NOTE: Must be the same VPC as the provided subnet IDs.'
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: 'Subnets you want your batch compute environment to launch in. We recommend private subnets. NOTE: Must be from the VPC provided.'
+  
+  WorkflowOrchestrator:
+    Type: String
+    Default: step-functions
+    AllowedValues:
+      - step-functions
+  
+  DockerImageAndMetadataVolumeSize:
+    Type: Number
+    Default: 75
+    Description: >-
+      Size of the docker metadata volume in GB.  Increase this value if you use
+      many large containers.
+  
+  LaunchTemplateNamePrefix:
+    Type: String
+    Default: fsx-lustre-genomics
+  
+  S3ImportPath:
+    Type: String
+    Description: >-
+      Existing S3 path (s3://bucket/prefix) that will be imported into the FSx 
+      Lustre filesystem
+  
+  LustreStorageCapacity:
+    Type: Number
+    MinValue: 3600
+    Default: 3600
+    Description: >-
+      Capacity in GB of the Lustre filesystem (minimum 3600)
+
+Resources:
+  IAMBatchInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+        - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+
+  IAMBatchInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: IAMBatchInstanceRole
+  
+  IAMBatchSpotFleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "spotfleet.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+  
+  IAMBatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: batch.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+
+  FSxLustreFileSystem:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: LUSTRE
+      LustreConfiguration:
+        ImportPath: !Ref S3ImportPath
+        ExportPath: !Ref S3ImportPath
+      StorageCapacity: !Ref LustreStorageCapacity
+      SecurityGroupIds:
+        - !Ref EC2BatchSecurityGroup
+      SubnetIds:
+        - !Select [0, !Ref SubnetIds]
+
+  EC2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Join ["-", [!Ref LaunchTemplateNamePrefix, !Select [2, !Split ["/", !Ref "AWS::StackId" ]]]]
+      LaunchTemplateData:
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+            - Key: architecture
+              Value: !FindInMap ["TagMap", "default", "architecture"]
+            - Key: solution
+              Value: !Ref WorkflowOrchestrator
+        BlockDeviceMappings:
+          - Ebs:
+              Encrypted: True
+              DeleteOnTermination: True
+              VolumeSize: !Ref DockerImageAndMetadataVolumeSize
+              VolumeType: gp2 
+            DeviceName: /dev/xvdcz
+        UserData:
+          Fn::Base64: !Sub |-
+            MIME-Version: 1.0
+            Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+
+            --==BOUNDARY==
+            Content-Type: text/cloud-config; charset="us-ascii"
+
+            packages:
+            - lustre-client
+
+            runcmd:
+            - mkdir -p /scratch
+            - mount -t lustre ${FSxLustreFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch
+
+            --==BOUNDARY==--
+  
+  EC2BatchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SG for genomics workflows on Batch
+      VpcId:
+        Ref: VpcId
+  SGSSHIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EC2BatchSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 0.0.0.0/0
+  SGAllTcpEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref EC2BatchSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      CidrIp: 0.0.0.0/0
+  SGAllTcpSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref EC2BatchSecurityGroup
+      IpProtocol: tcp
+      FromPort: 0
+      ToPort: 65535
+      SourceSecurityGroupId: !Ref EC2BatchSecurityGroup
+
+
+  BatchSpotComputeEnv:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      ComputeEnvironmentName: !Sub 
+        - spot-${StackGuid}
+        - StackGuid: !Select [ 2, !Split [ "/", !Ref "AWS::StackId" ]]
+      ServiceRole: !GetAtt IAMBatchServiceRole.Arn
+      Type: MANAGED
+      State: ENABLED
+      ComputeResources:
+        MinvCpus: 2
+        DesiredvCpus: 2
+        MaxvCpus: 256
+        Ec2KeyPair: !Ref KeyPairName
+        LaunchTemplate:
+          LaunchTemplateId: !Ref EC2LaunchTemplate
+        InstanceRole: !GetAtt IAMBatchInstanceProfile.Arn
+        InstanceTypes:
+          - optimal
+        SecurityGroupIds:
+          - !Ref EC2BatchSecurityGroup
+        SpotIamFleetRole: !GetAtt IAMBatchSpotFleetRole.Arn
+        Subnets: !Ref SubnetIds
+        Type: SPOT
+        Tags:
+          Name: !Sub
+            - batch-spot-worker-${StackGuid}
+            - StackGuid: !Select [ 2, !Split [ "/", !Ref "AWS::StackId" ]]
+
+  BatchDefaultQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      JobQueueName: !Sub
+        - default-${StackGuid}
+        - StackGuid: !Select [ 2, !Split [ "/", !Ref "AWS::StackId" ]]
+      Priority: 1
+      State: ENABLED
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BatchSpotComputeEnv
+        
+...
