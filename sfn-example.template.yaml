@@ -87,6 +87,21 @@ Resources:
                   - "codebuild:StartBuild"
                   - "codebuild:BatchGetBuilds"
                 Resource: "*"
+        - PolicyName: !Sub states-access-${AWS::Region}
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "states:ListStateMachines"
+                  - "states:DescribeStateMachine"
+                  - "states:DescribeStateMachineForExecution"
+                  - "states:StartExecution"
+                  - "states:ListExecutions"
+                  - "states:DescribeExecution"
+                  - "states:StopExecution"
+                  - "states:GetExecutionHistory"
+                Resource: "*"
 
   IAMStepFunctionsExecutionRole:
     Type: AWS::IAM::Role
@@ -211,6 +226,61 @@ Resources:
               
               cfnresponse.send(event, context, cfnresponse.SUCCESS, None)
 
+  LambdaWorkflowSubmissionFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt IAMLambdaExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 600
+      Code:
+        ZipFile: |
+          import json
+          import uuid
+
+          import boto3
+
+          def handler(event, context):
+
+              sfn = boto3.client('stepfunctions')
+
+              workflow_name = event['workflow_name']
+              execution_id = str(uuid.uuid4())
+
+              machines = {
+                  machine['name']: machine['stateMachineArn']
+                  for machine in sfn.list_state_machines(maxResults=1000)
+              }
+
+              # this injects the workflow_name and execution_id as environment variables
+              # to be passed in as ContainerOverrides to Batch Job Submissions
+              def object_hook(obj):
+                  if 'resources' in obj:
+                      obj['resources'].update({
+                          "Environment": [
+                              { "Name": "WORKFLOW_NAME", "Value": workflow_name },
+                              { "Name": "EXECUTION_ID", "Value": execution_id }
+                          ]
+                      })
+                  return obj
+              
+              workflow_input = json.loads(event['input'], object_hook=object_hook)
+              workflow_input.update(
+                  workflow_name=workflow_name,
+                  execution_id=execution_id
+              )
+
+              response = sfn.start_execution(
+                  stateMachineArn=machines[workflow_name], 
+                  name=workflow_input['execution_id'],
+                  input=json.dumps(workflow_input)
+              )
+
+              # make the response json serializble
+              response.update(startDate=str(response['startDate']))
+
+              return response
+  
   BatchJobDefFSxLustreLfs:
     Type: AWS::Batch::JobDefinition
     Properties:
@@ -275,7 +345,7 @@ Resources:
       Parameters:
         command: sort
         reference_name: "Homo_sapiens_assembly38"
-        sample_id: "SRR1919605"
+        sample_id: "NIST7035"
       
       ContainerProperties:
         Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/samtools:aws
@@ -301,7 +371,7 @@ Resources:
       Parameters:
         command: mpileup
         reference_name: "Homo_sapiens_assembly38"
-        sample_id: "SRR1919605"
+        sample_id: "NIST7035"
       
       ContainerProperties:
         Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/bcftools:aws
@@ -441,6 +511,12 @@ Outputs:
   LsfJobDefinition:
     Value: !Ref BatchJobDefFSxLustreLfs
   
+  LambdaWorkflowSubmissionFunction:
+    Value: !Ref LambdaWorkflowSubmissionFunction
+    Description: >-
+      Lambda function to use to execute workflows.  You need to use this function
+      since it customizes the inputs for the state-machine execution, injecting
+      workflow name and execution id.
   StateMachine:
     Value: !Ref SfnStateMachine
     Description: Step-functions state-machine that demonstrates a simple genomics workflow
@@ -449,16 +525,16 @@ Outputs:
     Description: Example input for the state machine
     Value: !Sub |
       {
+          "workflow_name": null,
+          "execution_id": null,
           "defaults": {
-              "queue": "${BatchJobQueue}",
-              "workflow_name": null,
-              "execution_id": null
+              "queue": "${BatchJobQueue}"
           },
           "bwa": {
               "mem": {
                   "parameters": {
                       "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "SRR1919605",
+                      "sample_id": "NIST7035",
                       "input_path": "./data",
                       "command": "mem"
                   },
@@ -472,7 +548,7 @@ Outputs:
               "sort": {
                   "parameters": {
                       "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "SRR1919605",
+                      "sample_id": "NIST7035",
                       "command": "sort"
                   },
                   "resources": {
@@ -483,7 +559,7 @@ Outputs:
               "index": {
                   "parameters": {
                       "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "SRR1919605",
+                      "sample_id": "NIST7035",
                       "command": "index"
                   },
                   "resources": {
@@ -496,7 +572,7 @@ Outputs:
               "mpileup": {
                   "parameters": {
                       "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "SRR1919605",
+                      "sample_id": "NIST7035",
                       "command": "mpileup"
                   },
                   "resources": {
@@ -507,7 +583,7 @@ Outputs:
               "call": {
                   "parameters": {
                       "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "SRR1919605",
+                      "sample_id": "NIST7035",
                       "command": "call"
                   },
                   "resources": {
