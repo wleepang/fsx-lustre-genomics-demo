@@ -164,12 +164,12 @@ Resources:
                   - aws ecr create-repository --repository-name samtools || true
                   - aws ecr create-repository --repository-name bcftools || true
                   - echo "Getting source code from Github"
-                  - git clone https://github.com/aws-samples/aws-genomics-workflows.git
+                  - git clone https://github.com/wleepang/fsx-lustre-genomics-demo.git
                   - cd aws-genomics-workflows
               build:
                 commands:
                   - echo "Building containers"
-                  - ROOT="$(pwd)/src/containers"
+                  - ROOT="$(pwd)/containers"
                   - cd $ROOT/bwa && ./build.sh
                   - cd $ROOT/samtools && ./build.sh
                   - cd $ROOT/bcftools && ./build.sh
