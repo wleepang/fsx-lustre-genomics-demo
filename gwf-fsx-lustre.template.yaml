@@ -43,11 +43,31 @@ Parameters:
     Type: String
     Default: fsx-lustre-genomics
   
-  S3ImportPath:
+  S3ReferencePath:
     Type: String
     Description: >-
-      Existing S3 path (s3://bucket/prefix) that will be imported into the FSx 
-      Lustre filesystem
+      Existing read-only S3 path (s3://bucket/prefix) that contains reference data.
+      Will be imported into an FSx Lustre filesystem and mounted to /scratch/reference
+      on worker instances.  When the workflow is complete, this filesystem is **NOT**
+      archived back to S3.
+    Default: s3://broad-references/hg38/v0
+  
+  S3SourceDataPath:
+    Type: String
+    Description: >-
+      Existing read-only S3 path (s3://bucket/prefix) that contains source data.
+      Will be imported into an FSx Lustre filesystem and mounted to /scratch/data
+      on worker instances.  When the workflow is complete, this filesystem is **NOT** 
+      archived back to S3.
+    Default: s3://aws-batch-genomics-shared/secondary-analysis/example-files/fastq/
+  
+  S3WorkingPath:
+    Type: String
+    Description: >-
+      Existing S3 path (s3://bucket/prefix) that will be imported into an FSx 
+      Lustre filesystem and mounted to /scratch/working on worker instances and 
+      used as shared space for workflow outputs and results. When the workflow is
+      complete, this filesystem is archived back to S3.
   
   LustreStorageCapacity:
     Type: Number
@@ -107,13 +127,37 @@ Resources:
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
-  FSxLustreFileSystem:
+  FSxLustreReferenceFileSystem:
     Type: AWS::FSx::FileSystem
     Properties:
       FileSystemType: LUSTRE
       LustreConfiguration:
-        ImportPath: !Ref S3ImportPath
-        ExportPath: !Ref S3ImportPath
+        ImportPath: !Ref S3ReferencePath
+      StorageCapacity: !Ref LustreStorageCapacity
+      SecurityGroupIds:
+        - !Ref EC2BatchSecurityGroup
+      SubnetIds:
+        - !Select [0, !Ref SubnetIds]
+  
+  FSxLustreSourceDataFileSystem:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: LUSTRE
+      LustreConfiguration:
+        ImportPath: !Ref S3SourceDataPath
+      StorageCapacity: !Ref LustreStorageCapacity
+      SecurityGroupIds:
+        - !Ref EC2BatchSecurityGroup
+      SubnetIds:
+        - !Select [0, !Ref SubnetIds]
+
+  FSxLustreWorkingFileSystem:
+    Type: AWS::FSx::FileSystem
+    Properties:
+      FileSystemType: LUSTRE
+      LustreConfiguration:
+        ImportPath: !Ref S3WorkingPath
+        ExportPath: !Ref S3WorkingPath
       StorageCapacity: !Ref LustreStorageCapacity
       SecurityGroupIds:
         - !Ref EC2BatchSecurityGroup
@@ -151,8 +195,10 @@ Resources:
             - lustre-client
 
             runcmd:
-            - mkdir -p /scratch
-            - mount -t lustre ${FSxLustreFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch
+            - mkdir -p /scratch/reference /scratch/data /scratch/working
+            - mount -t lustre ${FSxLustreReferenceFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/reference
+            - mount -t lustre ${FSxLustreSourceDataFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/data
+            - mount -t lustre ${FSxLustreWorkingFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/working
 
             --==BOUNDARY==--
   

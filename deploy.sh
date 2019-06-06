@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ -z $PROFILE ]; then
+    PROFILE=default
+fi
+
 CLI_INPUT_JSON=$(cat <<EOF
 {
     "Parameters": [
@@ -45,22 +49,22 @@ EOF
 
 
 function create() {
-    aws cloudformation create-stack \
-        --stack-name fsx-lustre-batch-test \
+    aws --profile $PROFILE cloudformation create-stack \
+        --stack-name gwf-fsx-test \
         --template-body file://gwf-fsx-lustre.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function update() {
-    aws cloudformation update-stack \
-        --stack-name fsx-lustre-batch-test \
+    aws --profile $PROFILE cloudformation update-stack \
+        --stack-name gwf-fsx-test \
         --template-body file://gwf-fsx-lustre.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function delete() {
-    aws cloudformation delete-stack \
-        --stack-name fsx-lustre-batch-test
+    aws --profile $PROFILE cloudformation delete-stack \
+        --stack-name gwf-fsx-test
 }
 
 function status() {
