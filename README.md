@@ -62,7 +62,7 @@ Bounce the stack:
 
 ## Submit a workflow
 
-Use the `execute.py` script and `inputs.json` file in the `./demo` to submit a workflow.
+Use the `execute.py` script and `inputs.json` file in the `./demo` folder to submit a workflow.
 
 Options for this script are:
 
