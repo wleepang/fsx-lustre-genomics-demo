@@ -30,7 +30,7 @@ function call() {
     bcftools call \
         -m \
         --threads 16 \
-        -r chr21 \
+        -t chr21 \
         -o $OUTPUT_PATH/${SAMPLE_ID}.vcf \
         $INPUT_PATH/${SAMPLE_ID}.mpileup.vcf.gz
 }
