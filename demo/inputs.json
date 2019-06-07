@@ -69,7 +69,7 @@
     "lsf": {
         "hsm_archive": {
             "parameters": {
-                "working_path": "/scratch/working"
+                "working_path": "/scratch/working/$WORKFLOW_NAME/$EXECUTION_ID"
             },
             "resources": {
                 "Vcpus": 2,
