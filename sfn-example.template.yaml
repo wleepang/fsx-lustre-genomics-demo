@@ -282,8 +282,6 @@ Resources:
     Properties:
       JobDefinitionName: fsx-lustre-lfs
       Type: container
-      Parameters:
-        working_path: /scratch/working
       ContainerProperties:
         Image: amazonlinux:2
         Vcpus: 2
@@ -291,7 +289,8 @@ Resources:
         Command:
           - bash
           - -c
-          - find Ref::working_path -type f -print0 | xargs -0 -n 1 lfs hsm_archive
+          - find /scratch/working/$WORKFLOW_NAME/$EXECUTION_ID -type f -print0 | xargs -0 -n 1 lfs hsm_archive
+        Privileged: True
         Volumes:
           - Host:
               SourcePath: /scratch
