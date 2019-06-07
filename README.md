@@ -1,6 +1,28 @@
 # Genomics Workflows with FSx for Lustre
 
-Demonstration code that shows how to use FSx for Lustre with genomics workflows.
+Demonstration code that shows how Amazon FSx for Lustre can be used with genomics workflows.
+
+## Overview
+
+This demo implements a simple genomics workflow using:
+
+* bwa-mem
+* samtools
+* bcftools
+
+to convert raw whole genome sequencing data (FASTQ) to called variants (VCF).
+
+The workflow uses containerized versions of the tools above and is orchestrated by AWS Step Functions and AWS Batch.  For more information on this architecture see:
+
+* https://aws.amazon.com/blogs/compute/building-high-throughput-genomics-batch-workflows-on-aws-introduction-part-1-of-4/
+* https://aws.amazon.com/blogs/compute/building-simpler-genomics-workflows-on-aws-step-functions/
+* https://docs.opendata.aws/genomics-workflows
+
+The reference architectures above rely on per-job staging of data from/to S3 on to the host instance that the job is running on.  This requires building in such capabilities into either your container image (e.g. adding the AWS CLI), or your workflow orchestration engine.
+
+Many existing bioinformatics tools read and output files and expect to interact with a POSIX compliant file system.  Similarly, existing genomics workflows may assume use of a shared file system across jobs.  Lastly, some tools have better performance when used in conjunction with high performance disk I/O.
+
+Amazon FSx for Lustre provides a managed, performant, and POSIX compliant filesystem that also supports transparent data syncing with S3.  This demonstration how Amazon FSx for Lustre can be used as a shared filesystem across all jobs of a genomics workflow.
 
 ## Requirements
 
