@@ -50,21 +50,21 @@ EOF
 
 function create() {
     aws --profile $PROFILE cloudformation create-stack \
-        --stack-name gwf-fsx-test \
-        --template-body file://gwf-fsx-lustre.template.yaml \
+        --stack-name gwf-fsx-infrastructure \
+        --template-body file://gwf-fsx-infrastructure.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function update() {
     aws --profile $PROFILE cloudformation update-stack \
-        --stack-name gwf-fsx-test \
-        --template-body file://gwf-fsx-lustre.template.yaml \
+        --stack-name gwf-fsx-infrastructure \
+        --template-body file://gwf-fsx-infrastructure.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function delete() {
     aws --profile $PROFILE cloudformation delete-stack \
-        --stack-name gwf-fsx-test
+        --stack-name gwf-fsx-infrastructure
 }
 
 function status() {
