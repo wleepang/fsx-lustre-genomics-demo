@@ -15,10 +15,10 @@ Mappings:
         - Key: "solution"
           Value: "step-functions"
 
-Parameters:
-  BatchJobQueue:
-    Description: Name or ARN of the AWS Batch Job Queue the workflow will use by default
-    Type: String
+# Parameters:
+#   BatchJobQueue:
+#     Description: Name or ARN of the AWS Batch Job Queue the workflow will use by default
+#     Type: String
 
 
 Resources:
@@ -519,7 +519,7 @@ Outputs:
   
   StateMachineInput:
     Description: Example input for the state machine
-    Value: !Sub |
+    Value: |
       {
           "workflow_name": null,
           "execution_id": null,

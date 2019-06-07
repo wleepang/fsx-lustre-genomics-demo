@@ -7,9 +7,9 @@
     "bwa": {
         "mem": {
             "parameters": {
-                "reference_name": "Homo_sapiens_assembly38",
+                "reference_name": "hg38/v0/Homo_sapiens_assembly38",
                 "sample_id": "NIST7035",
-                "input_path": "./data",
+                "input_path": "./data/secondary-analysis/example-files/fastq",
                 "command": "mem"
             },
             "resources": {
@@ -21,7 +21,7 @@
     "samtools": {
         "sort": {
             "parameters": {
-                "reference_name": "Homo_sapiens_assembly38",
+                "reference_name": "hg38/v0/Homo_sapiens_assembly38",
                 "sample_id": "NIST7035",
                 "command": "sort"
             },
@@ -32,7 +32,7 @@
         },
         "index": {
             "parameters": {
-                "reference_name": "Homo_sapiens_assembly38",
+                "reference_name": "hg38/v0/Homo_sapiens_assembly38",
                 "sample_id": "NIST7035",
                 "command": "index"
             },
@@ -45,7 +45,7 @@
     "bcftools": {
         "mpileup": {
             "parameters": {
-                "reference_name": "Homo_sapiens_assembly38",
+                "reference_name": "hg38/v0/Homo_sapiens_assembly38",
                 "sample_id": "NIST7035",
                 "command": "mpileup"
             },
@@ -56,7 +56,7 @@
         },
         "call": {
             "parameters": {
-                "reference_name": "Homo_sapiens_assembly38",
+                "reference_name": "hg38/v0/Homo_sapiens_assembly38",
                 "sample_id": "NIST7035",
                 "command": "call"
             },
