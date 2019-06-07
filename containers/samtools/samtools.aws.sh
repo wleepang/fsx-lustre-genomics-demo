@@ -33,7 +33,7 @@ function index() {
 
 function sort() {
     samtools sort \
-        -@ 8 \
+        -@ 16 \
         -o $OUTPUT_PATH/${SAMPLE_ID}.bam \
         $INPUT_PATH/${SAMPLE_ID}.sam
 }

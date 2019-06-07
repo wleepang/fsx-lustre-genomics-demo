@@ -28,7 +28,7 @@ fi
 
 function mem() {
     # command
-    bwa mem -p \
+    bwa mem -t 16 -p \
         $REFERENCE_PATH/${REFERENCE_NAME}.fasta \
         $INPUT_PATH/${SAMPLE_ID}_*1*.fastq.gz \
         > $OUTPUT_PATH/${SAMPLE_ID}.sam

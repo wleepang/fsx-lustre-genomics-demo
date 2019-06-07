@@ -29,14 +29,14 @@ fi
 function call() {
     bcftools call \
         -m \
-        --threads 8 \
+        --threads 16 \
         -o $OUTPUT_PATH/${SAMPLE_ID}.vcf \
         $INPUT_PATH/${SAMPLE_ID}.mpileup.vcf.gz \
 }
 
 function mpileup() {
     bcftools mpileup \
-        --threads 8 \
+        --threads 16 \
         -Oz \
         -f $REFERENCE_PATH/${REFERENCE_NAME}.fasta \
         $INPUT_PATH/${SAMPLE_ID}.bam \
