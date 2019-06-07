@@ -31,7 +31,7 @@ function call() {
         -m \
         --threads 16 \
         -o $OUTPUT_PATH/${SAMPLE_ID}.vcf \
-        $INPUT_PATH/${SAMPLE_ID}.mpileup.vcf.gz \
+        $INPUT_PATH/${SAMPLE_ID}.mpileup.vcf.gz
 }
 
 function mpileup() {
