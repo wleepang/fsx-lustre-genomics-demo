@@ -1,8 +1,8 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  (WWPS-GLS-WF-SFN-EXAMPLE) Creates the complete set of resources needed to run
-  genomics workflows using AWS Step-Functions on AWS Batch
+  (WWPS-GLS-WF-SFN-EXAMPLE-ISC) Creates tooling needed to run
+  an example genomics workflow using AWS Step-Functions on AWS Batch
 
 Mappings:
   TagMap:
@@ -14,12 +14,6 @@ Mappings:
           Value: "genomics-workflows"
         - Key: "solution"
           Value: "step-functions"
-
-# Parameters:
-#   BatchJobQueue:
-#     Description: Name or ARN of the AWS Batch Job Queue the workflow will use by default
-#     Type: String
-
 
 Resources:
   IAMCodeBuildRole:
@@ -512,91 +506,9 @@ Outputs:
       Lambda function to use to execute workflows.  You need to use this function
       since it customizes the inputs for the state-machine execution, injecting
       workflow name and execution id.
+      
   StateMachine:
     Value: !Ref SfnStateMachine
     Description: Step-functions state-machine that demonstrates a simple genomics workflow
   
-  StateMachineInput:
-    Description: Example input for the state machine
-    Value: |
-      {
-          "workflow_name": null,
-          "execution_id": null,
-          "defaults": {
-              "queue": "${BatchJobQueue}"
-          },
-          "bwa": {
-              "mem": {
-                  "parameters": {
-                      "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "NIST7035",
-                      "input_path": "./data",
-                      "command": "mem"
-                  },
-                  "resources": {
-                      "Vcpus": 8,
-                      "Memory": 64000
-                  }
-              }
-          },
-          "samtools": {
-              "sort": {
-                  "parameters": {
-                      "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "NIST7035",
-                      "command": "sort"
-                  },
-                  "resources": {
-                      "Vcpus": 8,
-                      "Memory": 32000
-                  }
-              },
-              "index": {
-                  "parameters": {
-                      "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "NIST7035",
-                      "command": "index"
-                  },
-                  "resources": {
-                      "Vcpus": 8,
-                      "Memory": 32000
-                  }
-              }
-          },
-          "bcftools": {
-              "mpileup": {
-                  "parameters": {
-                      "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "NIST7035",
-                      "command": "mpileup"
-                  },
-                  "resources": {
-                      "Vcpus": 8,
-                      "Memory": 32000
-                  }
-              },
-              "call": {
-                  "parameters": {
-                      "reference_name": "Homo_sapiens_assembly38",
-                      "sample_id": "NIST7035",
-                      "command": "call"
-                  },
-                  "resources": {
-                      "Vcpus": 8,
-                      "Memory": 32000
-                  }
-              }
-          },
-          "lsf": {
-              "hsm_archive": {
-                  "parameters": {
-                      "working_path": "/scratch/working"
-                  },
-                  "resources": {
-                      "Vcpus": 2,
-                      "Memory": 8000
-                  }
-              }
-          }
-      }
 ...
