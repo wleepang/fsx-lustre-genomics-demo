@@ -12,7 +12,7 @@ def handler(event, context):
 
     machines = {
         machine['name']: machine['stateMachineArn']
-        for machine in sfn.list_state_machines(maxResults=1000)
+        for machine in sfn.list_state_machines(maxResults=1000)['stateMachines']
     }
 
     # this injects the workflow_name and execution_id as environment variables

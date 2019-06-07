@@ -1,0 +1,80 @@
+{
+    "workflow_name": null,
+    "execution_id": null,
+    "defaults": {
+        "queue": "${BatchJobQueue}"
+    },
+    "bwa": {
+        "mem": {
+            "parameters": {
+                "reference_name": "Homo_sapiens_assembly38",
+                "sample_id": "NIST7035",
+                "input_path": "./data",
+                "command": "mem"
+            },
+            "resources": {
+                "Vcpus": 8,
+                "Memory": 64000
+            }
+        }
+    },
+    "samtools": {
+        "sort": {
+            "parameters": {
+                "reference_name": "Homo_sapiens_assembly38",
+                "sample_id": "NIST7035",
+                "command": "sort"
+            },
+            "resources": {
+                "Vcpus": 8,
+                "Memory": 32000
+            }
+        },
+        "index": {
+            "parameters": {
+                "reference_name": "Homo_sapiens_assembly38",
+                "sample_id": "NIST7035",
+                "command": "index"
+            },
+            "resources": {
+                "Vcpus": 8,
+                "Memory": 32000
+            }
+        }
+    },
+    "bcftools": {
+        "mpileup": {
+            "parameters": {
+                "reference_name": "Homo_sapiens_assembly38",
+                "sample_id": "NIST7035",
+                "command": "mpileup"
+            },
+            "resources": {
+                "Vcpus": 8,
+                "Memory": 32000
+            }
+        },
+        "call": {
+            "parameters": {
+                "reference_name": "Homo_sapiens_assembly38",
+                "sample_id": "NIST7035",
+                "command": "call"
+            },
+            "resources": {
+                "Vcpus": 8,
+                "Memory": 32000
+            }
+        }
+    },
+    "lsf": {
+        "hsm_archive": {
+            "parameters": {
+                "working_path": "/scratch/working"
+            },
+            "resources": {
+                "Vcpus": 2,
+                "Memory": 8000
+            }
+        }
+    }
+}
