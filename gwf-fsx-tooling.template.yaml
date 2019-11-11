@@ -502,6 +502,8 @@ Outputs:
   
   LambdaWorkflowSubmissionFunction:
     Value: !Ref LambdaWorkflowSubmissionFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaWorkflowSubmissionFunction"
     Description: >-
       Lambda function to use to execute workflows.  You need to use this function
       since it customizes the inputs for the state-machine execution, injecting
@@ -509,6 +511,8 @@ Outputs:
       
   StateMachine:
     Value: !Ref SfnStateMachine
+    Export:
+      Name: !Sub "${AWS::StackName}-SfnStatemachine"
     Description: Step-functions state-machine that demonstrates a simple genomics workflow
   
 ...

@@ -1,45 +1,30 @@
 #!/bin/bash
 
+SHA=`date | shasum | cut -d " " -f 1 | head -c8`
+REGION=us-east-2
+
+ASSET=${1:-infra}
+case $ASSET in
+    tools|tooling)
+        STACKNAME=gwf-fsx-tooling
+        ;;
+    infra|infrastructure)
+        STACKNAME=gwf-fsx-infrastructure
+        ;;
+    *)
+        echo "unrecognized asset"
+        exit 1
+esac
+
+COMMAND=${2:-create}
+
+
 if [ -z $PROFILE ]; then
     PROFILE=default
 fi
 
 CLI_INPUT_JSON=$(cat <<EOF
 {
-    "Parameters": [
-        {
-            "ParameterKey": "DockerImageAndMetadataVolumeSize", 
-            "ParameterValue": "75"
-        },
-        {
-            "ParameterKey": "KeyPairName", 
-            "ParameterValue": "pwyming"
-        },
-        {
-            "ParameterKey": "LaunchTemplateNamePrefix", 
-            "ParameterValue": "fsx-lustre-genomics"
-        },
-        {
-            "ParameterKey": "LustreStorageCapacity", 
-            "ParameterValue": "3600"
-        },
-        {
-            "ParameterKey": "S3ImportPath", 
-            "ParameterValue": "s3://pwyming-tmp-us-west-2"
-        },
-        {
-            "ParameterKey": "SubnetIds", 
-            "ParameterValue": "subnet-d481a3b2,subnet-b4eaa8fc"
-        },
-        {
-            "ParameterKey": "VpcId", 
-            "ParameterValue": "vpc-6432d41d"
-        },
-        {
-            "ParameterKey": "WorkflowOrchestrator", 
-            "ParameterValue": "step-functions"
-        }
-    ], 
     "Capabilities": [
         "CAPABILITY_IAM"
     ]
@@ -49,27 +34,31 @@ EOF
 
 
 function create() {
-    aws --profile $PROFILE cloudformation create-stack \
-        --stack-name gwf-fsx-infrastructure \
-        --template-body file://gwf-fsx-infrastructure.template.yaml \
+    aws --profile $PROFILE --region $REGION \
+        cloudformation create-stack \
+        --stack-name $STACKNAME \
+        --template-body file://${STACKNAME}.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function update() {
-    aws --profile $PROFILE cloudformation update-stack \
-        --stack-name gwf-fsx-infrastructure \
-        --template-body file://gwf-fsx-infrastructure.template.yaml \
+    aws --profile $PROFILE --region $REGION \
+        cloudformation update-stack \
+        --stack-name $STACKNAME \
+        --template-body file://${STACKNAME}.template.yaml \
         --cli-input-json "$CLI_INPUT_JSON"
 }
 
 function delete() {
-    aws --profile $PROFILE cloudformation delete-stack \
-        --stack-name gwf-fsx-infrastructure
+    aws --profile $PROFILE --region $REGION \
+        cloudformation delete-stack \
+        --stack-name $STACKNAME
 }
 
 function status() {
-    aws cloudformation describe-stacks \
-        --stack-name fsx-lustre-batch-test \
+    aws --profile $PROFILE --region $REGION \
+        cloudformation describe-stacks \
+        --stack-name $STACKNAME \
     | jq -r .Stacks[0].StackStatus
 }
 
@@ -91,4 +80,4 @@ function reset() {
     fi
 }
 
-$1
+$COMMAND

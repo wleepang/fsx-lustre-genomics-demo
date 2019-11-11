@@ -18,19 +18,27 @@ The workflow uses containerized versions of the tools above and is orchestrated 
 * https://aws.amazon.com/blogs/compute/building-simpler-genomics-workflows-on-aws-step-functions/
 * https://docs.opendata.aws/genomics-workflows
 
-The reference architectures above rely on per-job staging of data from/to S3 on to the host instance that the job is running on.  This requires building in such capabilities into either your container image (e.g. adding the AWS CLI), or your workflow orchestration engine.
+The reference architectures above rely on per-job staging of data from/to S3 onto the host instance that the job is running on.  This requires building in capabilities into either your container image (e.g. adding the AWS CLI), or your workflow orchestration engine.
 
-Many existing bioinformatics tools read and output files and expect to interact with a POSIX compliant file system.  Similarly, existing genomics workflows may assume use of a shared file system across jobs.  Lastly, some tools have better performance when used in conjunction with high performance disk I/O.
+Many existing bioinformatics tools read and output files, and expect to interact with a POSIX compliant file system.  Similarly, existing genomics workflows may assume use of a shared file system across jobs.  Lastly, some tools have better performance when used in conjunction with high performance disk I/O.
 
-Amazon FSx for Lustre provides a managed, performant, and POSIX compliant filesystem that also supports transparent data syncing with S3.  This demonstration how Amazon FSx for Lustre can be used as a shared filesystem across all jobs of a genomics workflow.
+Amazon FSx for Lustre provides a managed, performant, and POSIX compliant filesystem that also supports transparent data syncing with S3.  This demonstration shows how Amazon FSx for Lustre can be used as a shared filesystem across all jobs of a genomics workflow.
 
 ## Requirements
 
 * Python 3.7
-* boto3
-* awscli
+* Python Packages
+  
+  * boto3
+  * awscli
 
-Fulfill these with:
+Install python with your OS package manager of choice or using `conda` (recommended).
+
+```bash
+conda create -n fsx-demo python=3.7
+```
+
+Fulfill package requirements with:
 
 ```bash
 pip install -U -r requirements.txt
@@ -42,44 +50,55 @@ pip install -U -r requirements.txt
 
 Creates:
 
-* workflow job container images
+* Workflow job container images
 * AWS Batch Job Definitions for workflow jobs
 * AWS Step Functions state machine for workflow
 * Lambda function for submitting workflow
+* Required IAM roles and policies for all of the above
 
 ```bash
-aws cloudformation create-stack \
-    --stack-name gwf-fsx-tooling \
-    --capabilities CAPABILITY_IAM \
-    --template-body file://gwf-fsx-tooling.template.yaml
+./deploy.sh tools
 ```
+
+### Notes on Batch Job Definitions
+
+The tooling creates the following AWS Batch Job definitions
+
+| Name             | Description |
+| :--------------- | :---------- |
+| `bwa`            | Burrows-Wheeler Aligner.  Used to align raw sequencing data (i.e. FASTQ files) to a reference sequence.  Outputs a SAM file. |
+| `samtools`       | Utilities for QC and processing SAM files.  Used to process a SAM file and output a sorted binary representation (a BAM file) and a corresponding index (aBAI file). |
+| `bcftools`       | Utilities for generating and manipulating Variant Call Format (VCF) files and thier binary equivalent (BCF).  Used to generate variant calls - differences in sample sequence relative to reference.  Outputs GZIP'd MPILEUP and VCF files.  (_Note: For demonstration purposes, only Chromosome 21 is processed._) |
+| `fsx-lustre-lfs` | Used to archive FSx Lustre filesystems back to S3 when the workflow is complete.  Requires the LFS CLI `lfs` installed on the host instance and mapped into the container. |
 
 ## Deploy Infrastructure
 
 Creates:
 
+* AWS VPC with 2 private subnets in 2 availability zones
 * AWS Batch Compute Environment
 * AWS Batch Job Queue
 * FSx Lustre file systems for:
     * genome reference data - this uses the Broad References public dataset as a data repository and is therefore considered read-only.
     * workflow input data - this uses a public bucket with example raw whole genome sequencing data as a data repository and is therefor considered read-only.
     * workflow results data - this uses a pre-existing bucket your account as a data repository.  When the workflow is complete, any output data created is archived back to this bucket.
+* Required IAM roles and policies for all of the above
 
-Modify the `deploy.sh` script as needed to suit your account.
+The referenced CloudFormation template for the above infrastructure is fully self-contained and should not need parameter inputs beyond defaults.
 
 Create the stack:
 ```bash
-./deploy.sh create
+./deploy.sh infra create
 ```
 
 Delete the stack:
 ```bash
-./deploy.sh delete
+./deploy.sh infra delete
 ```
 
 Bounce the stack:
 ```bash
-./deploy.sh reset
+./deploy.sh infra reset
 ```
 
 ## Submit a workflow

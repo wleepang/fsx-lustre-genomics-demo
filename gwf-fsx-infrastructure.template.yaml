@@ -15,17 +15,7 @@ Mappings:
         - Key: "solution"
           Value: "step-functions"
 
-Parameters:
-  KeyPairName:
-    Type: AWS::EC2::KeyPair::KeyName
-
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: 'The VPC to create security groups and deploy AWS Batch to. NOTE: Must be the same VPC as the provided subnet IDs.'
-  SubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: 'Subnets you want your batch compute environment to launch in. We recommend private subnets. NOTE: Must be from the VPC provided.'
-  
+Parameters:  
   WorkflowOrchestrator:
     Type: String
     Default: step-functions
@@ -63,20 +53,55 @@ Parameters:
   
   S3WorkingPath:
     Type: String
+    Default: ""
     Description: >-
-      Existing S3 path (s3://bucket/prefix) that will be imported into an FSx 
+      Existing S3 path (s3://bucket/[prefix]) that will be imported into an FSx 
       Lustre filesystem and mounted to /scratch/working on worker instances and 
       used as shared space for workflow outputs and results. When the workflow is
       complete, this filesystem is archived back to S3.
   
+  S3WorkingPathExists:
+    Type: String
+    Description: Does this bucket already exist? If not, it will be created
+    AllowedValues:
+      - Yes
+      - No
+    Default: No
+  
   LustreStorageCapacity:
     Type: Number
-    MinValue: 3600
+    MinValue: 1200
     Default: 3600
     Description: >-
-      Capacity in GB of the Lustre filesystem (minimum 3600)
+      Capacity in GB of the Lustre filesystem. Minimum 1200, must be increased
+      in increments of 1200.
+
+Conditions:
+  BucketDoesNotExist:
+    Fn::Equals:
+      - !Ref S3WorkingPathExists
+      - No
+  
+  GenerateBucketName:
+    Fn::Equals:
+      - !Ref S3WorkingPath
+      - ""
 
 Resources:
+  VpcStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://aws-quickstart.s3.amazonaws.com/quickstart-aws-vpc/templates/aws-vpc.template
+      TimeoutInMinutes: 15
+      Parameters:
+        NumberOfAZs: "2"
+        AvailabilityZones:
+          Fn::Join:
+            - ","
+            - - !Select [ 0, !GetAZs "" ]
+              - !Select [ 1, !GetAZs "" ]
+      Tags: !FindInMap ["TagMap", "default", "tags"]
+
   IAMBatchInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -92,6 +117,7 @@ Resources:
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
         - "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 
   IAMBatchInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -127,6 +153,24 @@ Resources:
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
 
+  S3WorkingBucket:
+    Type: AWS::S3::Bucket
+    Condition: BucketDoesNotExist
+    DeletionPolicy: Retain
+    Properties:
+      BucketName:
+        Fn::If:
+          - GenerateBucketName
+          - Fn::Join:
+            - "-"
+            - - "gwf-fsx-demo"
+              - !Select [ 2, !Split [ "/", !Ref "AWS::StackId" ] ]
+          - !Ref S3WorkingPath
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
   FSxLustreReferenceFileSystem:
     Type: AWS::FSx::FileSystem
     Properties:
@@ -137,7 +181,7 @@ Resources:
       SecurityGroupIds:
         - !Ref EC2BatchSecurityGroup
       SubnetIds:
-        - !Select [0, !Ref SubnetIds]
+        - !Sub "${VpcStack.Outputs.PrivateSubnet1AID}"
   
   FSxLustreSourceDataFileSystem:
     Type: AWS::FSx::FileSystem
@@ -149,20 +193,28 @@ Resources:
       SecurityGroupIds:
         - !Ref EC2BatchSecurityGroup
       SubnetIds:
-        - !Select [0, !Ref SubnetIds]
+        - !Sub "${VpcStack.Outputs.PrivateSubnet1AID}"
 
   FSxLustreWorkingFileSystem:
     Type: AWS::FSx::FileSystem
     Properties:
       FileSystemType: LUSTRE
       LustreConfiguration:
-        ImportPath: !Ref S3WorkingPath
-        ExportPath: !Ref S3WorkingPath
+        ImportPath:
+          Fn::If:
+            - BucketDoesNotExist
+            - !Sub "s3://${S3WorkingBucket}"
+            - !Ref S3WorkingPath
+        ExportPath:
+          Fn::If:
+            - BucketDoesNotExist
+            - !Sub "s3://${S3WorkingBucket}"
+            - !Ref S3WorkingPath
       StorageCapacity: !Ref LustreStorageCapacity
       SecurityGroupIds:
         - !Ref EC2BatchSecurityGroup
       SubnetIds:
-        - !Select [0, !Ref SubnetIds]
+        - !Sub "${VpcStack.Outputs.PrivateSubnet1AID}"
 
   EC2LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -193,8 +245,10 @@ Resources:
 
             packages:
             - lustre-client
+            - amazon-ssm-agent
 
             runcmd:
+            - start amazon-ssm-agent
             - mkdir -p /scratch/reference /scratch/data /scratch/working
             - mount -t lustre ${FSxLustreReferenceFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/reference
             - mount -t lustre ${FSxLustreSourceDataFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/data
@@ -206,8 +260,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: SG for genomics workflows on Batch
-      VpcId:
-        Ref: VpcId
+      VpcId: !GetAtt "VpcStack.Outputs.VPCID"
   SGSSHIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -247,7 +300,6 @@ Resources:
         MinvCpus: 2
         DesiredvCpus: 2
         MaxvCpus: 256
-        Ec2KeyPair: !Ref KeyPairName
         LaunchTemplate:
           LaunchTemplateId: !Ref EC2LaunchTemplate
         InstanceRole: !GetAtt IAMBatchInstanceProfile.Arn
@@ -256,7 +308,7 @@ Resources:
         SecurityGroupIds:
           - !Ref EC2BatchSecurityGroup
         SpotIamFleetRole: !GetAtt IAMBatchSpotFleetRole.Arn
-        Subnets: !Ref SubnetIds
+        Subnets: !Sub "${VpcStack.Outputs.PrivateSubnet1AID}, ${VpcStack.Outputs.PrivateSubnet2AID}"
         Type: SPOT
         Tags:
           Name: !Sub
@@ -274,5 +326,48 @@ Resources:
       ComputeEnvironmentOrder:
         - Order: 1
           ComputeEnvironment: !Ref BatchSpotComputeEnv
-        
+
+Outputs:
+  BatchJobQueue:
+    Value: !Ref BatchDefaultQueue
+    Export:
+      Name: !Sub "${AWS::StackName}-BatchJobQueue"
+    Description: >
+      AWS Batch Job Queue used for workflow
+  
+  FSxReferenceData:
+    Value: !Ref FSxLustreReferenceFileSystem
+    Export:
+      Name: !Sub "${AWS::StackName}-FSxReferenceData"
+    Description: >
+      FSx Lustre file system for reference data.  Considered read-only by the workflow.
+  
+  FSxSourceData:
+    Value: !Ref FSxLustreSourceDataFileSystem
+    Export:
+      Name: !Sub "${AWS::StackName}-FSxSourceData"
+    Description: >
+      FSx Lustre file system used for source / input data to the workflow.
+      Considered read-only by the workflow.
+
+  FSxWorkingData:
+    Value: !Ref FSxLustreWorkingFileSystem
+    Export:
+      Name: !Sub "${AWS::StackName}-FSxWorkingData"
+    Description: >
+      FSx Lustre file system used for workflow generated output.
+      When the workflow is complete, any data written to this filesystem will be
+      archived back to the S3 path specified as its data repository.
+  
+  S3WorkingData:
+    Value:
+      Fn::If:
+        - BucketDoesNotExist
+        - !Sub "s3://${S3WorkingBucket}"
+        - !Ref S3WorkingPath
+    Export:
+      Name: !Sub "${AWS::StackName}-S3WorkingData"
+    Description: >
+      S3 data repository used for the FSx Lustre filesysme for workflow generated output.
+      When the workflow is complete, all results will be archived here.
 ...
