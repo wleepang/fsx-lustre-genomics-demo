@@ -250,9 +250,9 @@ Resources:
             runcmd:
             - start amazon-ssm-agent
             - mkdir -p /scratch/reference /scratch/data /scratch/working
-            - mount -t lustre ${FSxLustreReferenceFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/reference
-            - mount -t lustre ${FSxLustreSourceDataFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/data
-            - mount -t lustre ${FSxLustreWorkingFileSystem}.fsx.us-west-2.amazonaws.com@tcp:/fsx /scratch/working
+            - mount -t lustre ${FSxLustreReferenceFileSystem}.fsx.${AWS::Region}.amazonaws.com@tcp:/fsx /scratch/reference
+            - mount -t lustre ${FSxLustreSourceDataFileSystem}.fsx.${AWS::Region}.amazonaws.com@tcp:/fsx /scratch/data
+            - mount -t lustre ${FSxLustreWorkingFileSystem}.fsx.${AWS::Region}.amazonaws.com@tcp:/fsx /scratch/working
 
             --==BOUNDARY==--
   
@@ -308,7 +308,9 @@ Resources:
         SecurityGroupIds:
           - !Ref EC2BatchSecurityGroup
         SpotIamFleetRole: !GetAtt IAMBatchSpotFleetRole.Arn
-        Subnets: !Sub "${VpcStack.Outputs.PrivateSubnet1AID}, ${VpcStack.Outputs.PrivateSubnet2AID}"
+        Subnets:
+          - !Sub "${VpcStack.Outputs.PrivateSubnet1AID}"
+          - !Sub "${VpcStack.Outputs.PrivateSubnet2AID}"
         Type: SPOT
         Tags:
           Name: !Sub
