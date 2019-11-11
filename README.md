@@ -109,11 +109,14 @@ Options for this script are:
 
 ```text
 usage: execute.py [-h] [--profile PROFILE] [--region REGION]
-                  [--queue-name QUEUE_NAME] [--stack-name STACK_NAME]
                   [--stack-queue-name STACK_QUEUE_NAME]
-                  workflow_name inputs_json_file
+                  stack_name workflow_name inputs_json_file
 
 positional arguments:
+  stack_name            CloudFormation stack that contains a Batch Job Queue
+                        for job execution. Will use the queue whose name
+                        starts with "default" unless --stack-queue-name is
+                        specified.
   workflow_name         Name of the workflow (Sfn State Machine) to execute
   inputs_json_file      Path to inputs.json file to provide to the workflow
 
@@ -121,16 +124,9 @@ optional arguments:
   -h, --help            show this help message and exit
   --profile PROFILE     AWS profile to use
   --region REGION       AWS region name to use
-  --queue-name QUEUE_NAME
-                        Name of the Batch Job Queue for job execution
-  --stack-name STACK_NAME
-                        CloudFormation stack that contains a Batch Job Queue
-                        for job execution. Will use the queue whose name
-                        starts with "default" unless --stack-queue-name is
-                        specified. Ignored if --queue-name is specified.
   --stack-queue-name STACK_QUEUE_NAME
                         Name of the Batch Job Queue in the stack specified by
-                        --stack-name to use for job execution. Regex patterns
+                        stack_name to use for job execution. Regex patterns
                         are allowed.
 ```
 
@@ -143,7 +139,7 @@ Submitting a workflow looks like this:
 ```bash
 cd demo
 python execute.py \
-    --stack-name gwf-fsx-infrastructure \
+    gwf-fsx-infrastructure \
     example-genomics-workflow-20da0440-893d-11e9-8d64-06c01b62978e \
     ./inputs.json
 
