@@ -1,6 +1,5 @@
 #!/bin/bash
 
-SHA=`date | shasum | cut -d " " -f 1 | head -c8`
 REGION=us-east-2
 
 ASSET=${1:-infra}
