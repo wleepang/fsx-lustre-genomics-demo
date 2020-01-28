@@ -66,8 +66,8 @@
             }
         }
     },
-    "lfs": {
-        "hsm_archive": {
+    "fsx": {
+        "data_repository_task": {
             "parameters": {
                 "working_path": "/scratch/working/$WORKFLOW_NAME/$EXECUTION_ID"
             },

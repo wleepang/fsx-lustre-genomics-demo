@@ -69,7 +69,7 @@ The tooling creates the following AWS Batch Job definitions
 | `bwa`            | Burrows-Wheeler Aligner.  Used to align raw sequencing data (i.e. FASTQ files) to a reference sequence.  Outputs a SAM file. |
 | `samtools`       | Utilities for QC and processing SAM files.  Used to process a SAM file and output a sorted binary representation (a BAM file) and a corresponding index (aBAI file). |
 | `bcftools`       | Utilities for generating and manipulating Variant Call Format (VCF) files and thier binary equivalent (BCF).  Used to generate variant calls - differences in sample sequence relative to reference.  Outputs GZIP'd MPILEUP and VCF files.  (_Note: For demonstration purposes, only Chromosome 21 is processed._) |
-| `fsx-lustre-lfs` | Used to archive FSx Lustre filesystems back to S3 when the workflow is complete.  Requires the LFS CLI `lfs` installed on the host instance and mapped into the container. |
+| `fsx-data-repo-task` | Used to archive FSx Lustre filesystems back to S3 when the workflow is complete.  Requires that the AWS CLI be installed on the host instance and mapped into the container. |
 
 ## Deploy Infrastructure
 

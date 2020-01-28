@@ -271,32 +271,38 @@ Resources:
 
               return response
   
-  BatchJobDefFSxLustreLfs:
+  BatchJobDefFSxDataRepositoryTask:
     Type: AWS::Batch::JobDefinition
     Properties:
-      JobDefinitionName: fsx-lustre-lfs
+      JobDefinitionName: fsx-data-repo-task
       Type: container
       ContainerProperties:
         Image: amazonlinux:2
         Vcpus: 2
         Memory: 8000
         Command:
-          - bash
-          - -c
-          - find /scratch/working/$WORKFLOW_NAME/$EXECUTION_ID -type f -print0 | xargs -0 -n 1 lfs hsm_archive
+          - /opt/miniconda/bin/aws
+          - fsx
+          - create-data-repository-task
+          - --file-system-id
+          - !Ref FSxLustreWorkingFileSystem
+          - --paths
+          - /scratch/working/$WORKFLOW_NAME/$EXECUTION_ID
+          - --report
+          - !Sub "Enabled=true,Scope=FAILED_FILES_ONLY,Format=REPORT_CSV_20191124,Path=${S3WorkingPath}"
         Privileged: True
         Volumes:
           - Host:
               SourcePath: /scratch
             Name: scratch
           - Host:
-              SourcePath: /usr/bin/lfs
-            Name: lfs-cli
+              SourcePath: /opt/miniconda
+            Name: aws-cli
         MountPoints:
           - ContainerPath: /scratch
             SourceVolume: scratch
-          - ContainerPath: /usr/bin/lfs
-            SourceVolume: lfs-cli
+          - ContainerPath: /opt/miniconda
+            SourceVolume: aws-cli
         
   BatchJobDefBwa:
     Type: AWS::Batch::JobDefinition
@@ -459,19 +465,19 @@ Resources:
                         "Parameters.$": "$.bcftools.call.parameters",
                         "ContainerOverrides.$": "$.bcftools.call.resources"
                     },
-                    "Next": "LfsHsmArchive"
+                    "Next": "ExportToDataRepository"
                 },
-                "LfsHsmArchive": {
+                "ExportToDataRepository": {
                     "Type": "Task",
                     "InputPath": "$",
-                    "ResultPath": "$.lfs.hsm_archive.result",
+                    "ResultPath": "$.fsx.data_repository_task.result",
                     "Resource": "arn:aws:states:::batch:submitJob.sync",
                     "Parameters": {
-                        "JobName": "lfs-hsm_archive",
-                        "JobDefinition": "${BatchJobDefFSxLustreLfs}",
+                        "JobName": "export-to-data-repository",
+                        "JobDefinition": "${BatchJobDefFSxDataRepositoryTask}",
                         "JobQueue.$": "$.defaults.queue",
                         "Parameters.$": "$.lfs.hsm_archive.parameters",
-                        "ContainerOverrides.$": "$.lfs.hsm_archive.resources"
+                        "ContainerOverrides.$": "$.fsx.data_repository_task.resources"
                     },
                     "End": true
                 }
